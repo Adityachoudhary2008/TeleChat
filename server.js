@@ -15,34 +15,28 @@ io.on("connection", (socket) => {
 
     socket.on("join", (username) => {
         socket.username = username;
+        socket.emit("self-id", socket.id);
         socket.broadcast.emit("system", `${username} joined TeleChat`);
     });
 
-    // MESSAGE SEND (SERVER TIME + DELIVERY)
-    socket.on("message", (payload, callback) => {
+    socket.on("message", (payload) => {
         const message = {
-            id: Date.now() + Math.random(),
+            id: crypto.randomUUID(),
             user: socket.username,
+            senderId: socket.id,
             text: payload.text,
-            time: new Date().toLocaleTimeString("en-IN", {
-                hour: "2-digit",
-                minute: "2-digit"
-            })
+            createdAt: new Date().toISOString(),
+            status: "delivered"
         };
 
-        // send to everyone
         io.emit("message", message);
-
-        // delivered ack (to sender)
-        callback({ delivered: true });
     });
 
-    // SEEN STATUS
     socket.on("seen", (messageId) => {
         socket.broadcast.emit("seen", messageId);
     });
 
-    // TYPING INDICATOR (FIXED)
+    // typing indicator (stable)
     socket.on("typing", () => {
         socket.broadcast.emit("typing", socket.username);
     });
