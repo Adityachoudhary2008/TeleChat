@@ -14,12 +14,20 @@ const overlay = document.getElementById("overlay");
 
 const imageInput = document.getElementById("imageInput");
 const videoInput = document.getElementById("videoInput");
-const fileInput = document.getElementById("fileInput");
+const fileInput  = document.getElementById("fileInput");
+
+const voiceControls = document.getElementById("voiceControls");
+const cancelVoice = document.getElementById("cancelVoice");
+const sendVoice = document.getElementById("sendVoice");
 
 /* ===== STATE ===== */
 let username = prompt("Enter your name") || "Guest";
 let mySocketId = null;
 let typingTimeout;
+
+let recorder = null;
+let audioChunks = [];
+let recordedBlob = null;
 
 /* ===== JOIN ===== */
 socket.emit("join", username);
@@ -39,7 +47,7 @@ form.addEventListener("submit", e => {
 socket.on("message", renderMessage);
 socket.on("media-message", renderMessage);
 
-/* ===== RENDER ===== */
+/* ===== RENDER MESSAGE ===== */
 function renderMessage(msg) {
     if (!mySocketId) return;
 
@@ -53,11 +61,26 @@ function renderMessage(msg) {
     });
 
     let content = "";
-    if (msg.type === "text") content = msg.text;
-    if (msg.type === "image") content = `<img src="${msg.url}" style="max-width:100%;border-radius:8px;">`;
-    if (msg.type === "video") content = `<video src="${msg.url}" controls style="max-width:100%;border-radius:8px;"></video>`;
-    if (msg.type === "file") content = `<a href="${msg.url}" target="_blank">📄 Download file</a>`;
-    if (msg.type === "audio") content = `<audio controls src="${msg.url}"></audio>`;
+
+    if (msg.type === "text") {
+        content = msg.text;
+    }
+
+    if (msg.type === "image") {
+        content = `<img src="${msg.url}" style="max-width:100%;border-radius:8px;" />`;
+    }
+
+    if (msg.type === "video") {
+        content = `<video src="${msg.url}" controls style="max-width:100%;border-radius:8px;"></video>`;
+    }
+
+    if (msg.type === "file") {
+        content = `<a href="${msg.url}" target="_blank">📄 Download file</a>`;
+    }
+
+    if (msg.type === "audio") {
+        content = `<audio controls src="${msg.url}"></audio>`;
+    }
 
     div.innerHTML = `
         <strong>${msg.user}</strong><br>
@@ -86,26 +109,25 @@ attachBtn.onclick = () => {
     attachmentMenu.classList.add("show");
     overlay.classList.add("show");
 };
-overlay.onclick = () => {
+
+overlay.onclick = closeMenu;
+
+function closeMenu() {
     attachmentMenu.classList.remove("show");
     overlay.classList.remove("show");
-};
+}
 
 document.querySelectorAll(".menu-item").forEach(item => {
     item.onclick = () => {
-        attachmentMenu.classList.remove("show");
-        overlay.classList.remove("show");
-
+        closeMenu();
         if (item.dataset.type === "image") imageInput.click();
         if (item.dataset.type === "video") videoInput.click();
         if (item.dataset.type === "file") fileInput.click();
     };
 });
 
-/* ===== UPLOAD TO CLOUDINARY ===== */
+/* ===== UPLOAD VIA CLOUDINARY ===== */
 async function uploadAndSend(file, type) {
-    if (!file) return;
-
     const reader = new FileReader();
     reader.onload = async () => {
         const res = await fetch("/upload", {
@@ -123,9 +145,7 @@ imageInput.onchange = () => uploadAndSend(imageInput.files[0], "image");
 videoInput.onchange = () => uploadAndSend(videoInput.files[0], "video");
 fileInput.onchange  = () => uploadAndSend(fileInput.files[0], "file");
 
-/* ===== VOICE MESSAGE ===== */
-let recorder, chunks = [];
-
+/* ===== VOICE MESSAGE (OLD UX RESTORED) ===== */
 micBtn.onclick = async () => {
     if (recorder && recorder.state === "recording") {
         recorder.stop();
@@ -134,12 +154,27 @@ micBtn.onclick = async () => {
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     recorder = new MediaRecorder(stream);
-    chunks = [];
+    audioChunks = [];
 
-    recorder.ondataavailable = e => chunks.push(e.data);
+    recorder.ondataavailable = e => audioChunks.push(e.data);
+
     recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "audio/webm" });
-        uploadAndSend(new File([blob], "voice.webm"), "audio");
+        recordedBlob = new Blob(audioChunks, { type: "audio/webm" });
+        voiceControls.classList.add("show");
     };
+
     recorder.start();
+};
+
+cancelVoice.onclick = () => {
+    recordedBlob = null;
+    voiceControls.classList.remove("show");
+};
+
+sendVoice.onclick = () => {
+    if (!recordedBlob) return;
+
+    uploadAndSend(new File([recordedBlob], "voice.webm"), "audio");
+    recordedBlob = null;
+    voiceControls.classList.remove("show");
 };
