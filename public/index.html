@@ -14,7 +14,10 @@
     <div id="typingIndicator" class="typing"></div>
 
     <form class="input-box" id="form">
-        <input id="input" type="text" placeholder="Message" autocomplete="off" required />
+        <label for="fileInput" style="cursor:pointer;">📎</label>
+        <input type="file" id="fileInput" hidden />
+
+        <input id="input" type="text" placeholder="Message" autocomplete="off" />
         <button type="submit">➤</button>
     </form>
 </div>

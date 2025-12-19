@@ -3,6 +3,7 @@ const socket = io();
 const chat = document.getElementById("chat");
 const form = document.getElementById("form");
 const input = document.getElementById("input");
+const fileInput = document.getElementById("fileInput");
 const typingIndicator = document.getElementById("typingIndicator");
 
 let username = prompt("Enter your name") || "Guest";
@@ -11,11 +12,9 @@ let typingTimeout;
 
 socket.emit("join", username);
 
-socket.on("self-id", (id) => {
-    mySocketId = id;
-});
+socket.on("self-id", (id) => mySocketId = id);
 
-// send message
+// SEND TEXT MESSAGE (unchanged)
 form.addEventListener("submit", (e) => {
     e.preventDefault();
     const text = input.value.trim();
@@ -26,10 +25,38 @@ form.addEventListener("submit", (e) => {
     socket.emit("stopTyping");
 });
 
-// receive message
-socket.on("message", (msg) => {
-    const isMe = msg.senderId === mySocketId;
+// MEDIA UPLOAD
+fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    if (!file) return;
 
+    const reader = new FileReader();
+    reader.onload = () => {
+        const mediaType = file.type.startsWith("image")
+            ? "image"
+            : file.type.startsWith("video")
+            ? "video"
+            : "file";
+
+        socket.emit("media-message", {
+            mediaType,
+            fileName: file.name,
+            fileType: file.type,
+            data: reader.result
+        });
+    };
+    reader.readAsDataURL(file);
+    fileInput.value = "";
+});
+
+// RECEIVE TEXT MESSAGE
+socket.on("message", (msg) => renderMessage(msg));
+
+// RECEIVE MEDIA MESSAGE
+socket.on("media-message", (msg) => renderMessage(msg));
+
+function renderMessage(msg) {
+    const isMe = msg.senderId === mySocketId;
     const div = document.createElement("div");
     div.className = `msg ${isMe ? "me" : "other"}`;
     div.dataset.id = msg.id;
@@ -39,27 +66,30 @@ socket.on("message", (msg) => {
         minute: "2-digit"
     });
 
+    let content = "";
+    if (msg.type === "text") {
+        content = msg.text;
+    } else if (msg.type === "image") {
+        content = `<img src="${msg.data}" style="max-width:100%;border-radius:8px;" />`;
+    } else if (msg.type === "video") {
+        content = `<video src="${msg.data}" controls style="max-width:100%;border-radius:8px;"></video>`;
+    } else {
+        content = `<a href="${msg.data}" download="${msg.fileName}">📄 ${msg.fileName}</a>`;
+    }
+
     div.innerHTML = `
         <strong>${msg.user}</strong><br>
-        ${msg.text}
-        <span class="time">${time} ${isMe ? "✓" : ""}</span>
+        ${content}
+        <span class="time">${time} ${isMe ? "✓✓" : ""}</span>
     `;
 
     chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
 
     if (!isMe) socket.emit("seen", msg.id);
-});
+}
 
-// seen update
-socket.on("seen", (id) => {
-    const msg = document.querySelector(`[data-id="${id}"] .time`);
-    if (msg && !msg.innerText.includes("✓✓")) {
-        msg.innerText += "✓";
-    }
-});
-
-// typing indicator (reliable)
+// TYPING (unchanged)
 input.addEventListener("input", () => {
     socket.emit("typing");
     clearTimeout(typingTimeout);
@@ -78,7 +108,7 @@ socket.on("stopTyping", () => {
     typingIndicator.innerText = "";
 });
 
-// system messages
+// SYSTEM
 socket.on("system", (text) => {
     const div = document.createElement("div");
     div.className = "system";

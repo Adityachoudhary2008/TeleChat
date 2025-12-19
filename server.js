@@ -1,6 +1,7 @@
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
+const crypto = require("crypto");
 
 const app = express();
 const server = http.createServer(app);
@@ -19,24 +20,38 @@ io.on("connection", (socket) => {
         socket.broadcast.emit("system", `${username} joined TeleChat`);
     });
 
+    // TEXT MESSAGE (unchanged)
     socket.on("message", (payload) => {
         const message = {
             id: crypto.randomUUID(),
+            type: "text",
             user: socket.username,
             senderId: socket.id,
             text: payload.text,
-            createdAt: new Date().toISOString(),
-            status: "delivered"
+            createdAt: new Date().toISOString()
         };
-
         io.emit("message", message);
     });
 
-    socket.on("seen", (messageId) => {
-        socket.broadcast.emit("seen", messageId);
+    // MEDIA MESSAGE (NEW)
+    socket.on("media-message", (payload) => {
+        const message = {
+            id: crypto.randomUUID(),
+            type: payload.mediaType, // image | video | file
+            user: socket.username,
+            senderId: socket.id,
+            fileName: payload.fileName,
+            fileType: payload.fileType,
+            data: payload.data,
+            createdAt: new Date().toISOString()
+        };
+        io.emit("media-message", message);
     });
 
-    // typing indicator (stable)
+    socket.on("seen", (id) => {
+        socket.broadcast.emit("seen", id);
+    });
+
     socket.on("typing", () => {
         socket.broadcast.emit("typing", socket.username);
     });
