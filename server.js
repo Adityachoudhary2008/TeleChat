@@ -1,22 +1,26 @@
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
-const path = require("path");
-const fs = require("fs");
 const crypto = require("crypto");
+const cloudinary = require("cloudinary").v2;
 
 const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
-    cors: { origin: "*", methods: ["GET", "POST"] }
+    cors: { origin: "*" }
 });
 
-app.use(express.json({ limit: "20mb" }));
-app.use(express.static("public"));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+cloudinary.config({
+    cloud_name: dqymsvsrr,
+    api_key: 162949727147937,
+    api_secret: e5OdHJvKXlmwj_bAZldiUXL9hKU
+});
 
-// ================== SOCKET ==================
+app.use(express.json({ limit: "50mb" }));
+app.use(express.static("public"));
+
+/* ================= SOCKET ================= */
 io.on("connection", (socket) => {
 
     socket.on("join", (username) => {
@@ -47,17 +51,9 @@ io.on("connection", (socket) => {
         });
     });
 
-    socket.on("seen", (id) => {
-        socket.broadcast.emit("seen", id);
-    });
-
-    socket.on("typing", () => {
-        socket.broadcast.emit("typing", socket.username);
-    });
-
-    socket.on("stopTyping", () => {
-        socket.broadcast.emit("stopTyping");
-    });
+    socket.on("seen", (id) => socket.broadcast.emit("seen", id));
+    socket.on("typing", () => socket.broadcast.emit("typing", socket.username));
+    socket.on("stopTyping", () => socket.broadcast.emit("stopTyping"));
 
     socket.on("disconnect", () => {
         if (socket.username) {
@@ -66,35 +62,24 @@ io.on("connection", (socket) => {
     });
 });
 
-// ================== UPLOAD API ==================
-app.post("/upload", (req, res) => {
+/* ================= CLOUDINARY UPLOAD ================= */
+app.post("/upload", async (req, res) => {
     try {
-        const { fileName, data } = req.body;
-        if (!fileName || !data) {
-            return res.status(400).json({ error: "Invalid upload" });
-        }
+        const { data, type } = req.body;
+        if (!data) return res.status(400).json({ error: "No file data" });
 
-        const uploadDir = path.join(__dirname, "uploads");
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir);
-        }
+        const result = await cloudinary.uploader.upload(data, {
+            resource_type: type === "video" || type === "audio" ? "video" : "image"
+        });
 
-        const base64 = data.split(",")[1];
-        const buffer = Buffer.from(base64, "base64");
-
-        const safeName = Date.now() + "-" + fileName.replace(/\s+/g, "_");
-        const filePath = path.join(uploadDir, safeName);
-
-        fs.writeFileSync(filePath, buffer);
-
-        res.json({ url: `/uploads/${safeName}` });
+        res.json({ url: result.secure_url });
     } catch (err) {
-        console.error("Upload error:", err);
+        console.error("Cloudinary error:", err);
         res.status(500).json({ error: "Upload failed" });
     }
 });
 
-// ================== START ==================
+/* ================= START ================= */
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log("TeleChat running on port", PORT);

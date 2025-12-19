@@ -1,6 +1,6 @@
 const socket = io();
 
-// ===== DOM =====
+/* ===== DOM ===== */
 const chat = document.getElementById("chat");
 const form = document.getElementById("form");
 const input = document.getElementById("input");
@@ -16,35 +16,30 @@ const imageInput = document.getElementById("imageInput");
 const videoInput = document.getElementById("videoInput");
 const fileInput = document.getElementById("fileInput");
 
-const voiceControls = document.getElementById("voiceControls");
-const cancelVoice = document.getElementById("cancelVoice");
-const sendVoice = document.getElementById("sendVoice");
-
-// ===== STATE =====
+/* ===== STATE ===== */
 let username = prompt("Enter your name") || "Guest";
 let mySocketId = null;
-let typingTimeout = null;
+let typingTimeout;
 
-// ===== JOIN =====
+/* ===== JOIN ===== */
 socket.emit("join", username);
-socket.on("self-id", (id) => mySocketId = id);
+socket.on("self-id", id => mySocketId = id);
 
-// ===== SEND TEXT =====
-form.addEventListener("submit", (e) => {
+/* ===== SEND TEXT ===== */
+form.addEventListener("submit", e => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
-
     socket.emit("message", { text });
     input.value = "";
     socket.emit("stopTyping");
 });
 
-// ===== RECEIVE =====
+/* ===== RECEIVE ===== */
 socket.on("message", renderMessage);
 socket.on("media-message", renderMessage);
 
-// ===== RENDER =====
+/* ===== RENDER ===== */
 function renderMessage(msg) {
     if (!mySocketId) return;
 
@@ -58,11 +53,10 @@ function renderMessage(msg) {
     });
 
     let content = "";
-
     if (msg.type === "text") content = msg.text;
     if (msg.type === "image") content = `<img src="${msg.url}" style="max-width:100%;border-radius:8px;">`;
     if (msg.type === "video") content = `<video src="${msg.url}" controls style="max-width:100%;border-radius:8px;"></video>`;
-    if (msg.type === "file") content = `<a href="${msg.url}" download>📄 Download file</a>`;
+    if (msg.type === "file") content = `<a href="${msg.url}" target="_blank">📄 Download file</a>`;
     if (msg.type === "audio") content = `<audio controls src="${msg.url}"></audio>`;
 
     div.innerHTML = `
@@ -73,36 +67,25 @@ function renderMessage(msg) {
 
     chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
-
-    if (!isMe && msg.id) socket.emit("seen", msg.id);
 }
 
-// ===== SEEN =====
-socket.on("seen", (id) => {
-    const el = document.querySelector(`[data-id="${id}"] .time`);
-    if (el && !el.innerText.includes("✓✓")) {
-        el.innerText = el.innerText.replace("✓", "✓✓");
-    }
-});
-
-// ===== TYPING =====
+/* ===== TYPING ===== */
 input.addEventListener("input", () => {
     socket.emit("typing");
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => socket.emit("stopTyping"), 800);
 });
 
-socket.on("typing", (u) => {
+socket.on("typing", u => {
     if (u !== username) typingIndicator.innerText = `${u} is typing...`;
 });
 socket.on("stopTyping", () => typingIndicator.innerText = "");
 
-// ===== ATTACHMENT MENU =====
+/* ===== ATTACHMENT MENU ===== */
 attachBtn.onclick = () => {
     attachmentMenu.classList.add("show");
     overlay.classList.add("show");
 };
-
 overlay.onclick = () => {
     attachmentMenu.classList.remove("show");
     overlay.classList.remove("show");
@@ -119,7 +102,7 @@ document.querySelectorAll(".menu-item").forEach(item => {
     };
 });
 
-// ===== HTTP UPLOAD + SOCKET EMIT =====
+/* ===== UPLOAD TO CLOUDINARY ===== */
 async function uploadAndSend(file, type) {
     if (!file) return;
 
@@ -128,18 +111,10 @@ async function uploadAndSend(file, type) {
         const res = await fetch("/upload", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                fileName: file.name,
-                data: reader.result
-            })
+            body: JSON.stringify({ data: reader.result, type })
         });
-
         const { url } = await res.json();
-
-        socket.emit("media-message", {
-            type,
-            url
-        });
+        socket.emit("media-message", { type, url });
     };
     reader.readAsDataURL(file);
 }
@@ -148,7 +123,7 @@ imageInput.onchange = () => uploadAndSend(imageInput.files[0], "image");
 videoInput.onchange = () => uploadAndSend(videoInput.files[0], "video");
 fileInput.onchange  = () => uploadAndSend(fileInput.files[0], "file");
 
-// ===== VOICE MESSAGE =====
+/* ===== VOICE MESSAGE ===== */
 let recorder, chunks = [];
 
 micBtn.onclick = async () => {
@@ -166,6 +141,5 @@ micBtn.onclick = async () => {
         const blob = new Blob(chunks, { type: "audio/webm" });
         uploadAndSend(new File([blob], "voice.webm"), "audio");
     };
-
     recorder.start();
 };
