@@ -194,3 +194,54 @@ body {
 .menu-item:hover {
     background: #1f2937;
 }
+/* ===== Voice Message UI ===== */
+
+#micBtn {
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.voice-controls {
+    position: fixed;
+    bottom: -120px;
+    left: 0;
+    width: 100%;
+    background: #111827;
+    padding: 16px;
+    text-align: center;
+    transition: bottom 0.3s ease;
+    z-index: 20;
+}
+
+.voice-controls.show {
+    bottom: 0;
+}
+
+#recordingStatus {
+    color: #e5e7eb;
+    display: block;
+    margin-bottom: 10px;
+}
+
+.voice-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+.voice-actions button {
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+}
+
+#cancelVoice {
+    background: #374151;
+    color: white;
+}
+
+#sendVoice {
+    background: #2563eb;
+    color: white;
+}

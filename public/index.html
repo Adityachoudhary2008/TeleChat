@@ -16,17 +16,23 @@
 
     <form class="input-box" id="form">
         <span id="attachBtn">📎</span>
+        <span id="micBtn">🎤</span>
 
         <input id="input" type="text" placeholder="Message" autocomplete="off" />
-
-        <!-- VOICE BUTTON -->
-        <span id="voiceBtn" title="Hold to record">🎤</span>
-
         <button type="submit">➤</button>
     </form>
 </div>
 
-<!-- Attachment UI (unchanged) -->
+<!-- Voice Recorder Controls -->
+<div class="voice-controls" id="voiceControls">
+    <span id="recordingStatus">🎙️ Recording...</span>
+    <div class="voice-actions">
+        <button id="cancelVoice">Cancel</button>
+        <button id="sendVoice">Send</button>
+    </div>
+</div>
+
+<!-- Existing Attachment Menu -->
 <div class="overlay" id="overlay"></div>
 
 <div class="attachment-menu" id="attachmentMenu">
@@ -35,7 +41,7 @@
     <div class="menu-item" data-type="file">📄 Document</div>
 </div>
 
-<!-- Hidden inputs (unchanged) -->
+<!-- Hidden Inputs -->
 <input type="file" id="imageInput" accept="image/*" hidden>
 <input type="file" id="videoInput" accept="video/*" hidden>
 <input type="file" id="fileInput" hidden>
