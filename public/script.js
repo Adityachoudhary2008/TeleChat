@@ -26,10 +26,9 @@ socket.on("self-id", (id) => {
     mySocketId = id;
 });
 
-// ===== SEND TEXT MESSAGE =====
+// ===== SEND TEXT =====
 form.addEventListener("submit", (e) => {
     e.preventDefault();
-
     const text = input.value.trim();
     if (!text) return;
 
@@ -38,23 +37,17 @@ form.addEventListener("submit", (e) => {
     socket.emit("stopTyping");
 });
 
-// ===== RECEIVE TEXT MESSAGE =====
-socket.on("message", (msg) => {
-    renderMessage(msg);
-});
+// ===== RECEIVE =====
+socket.on("message", renderMessage);
+socket.on("media-message", renderMessage);
 
-// ===== RECEIVE MEDIA MESSAGE =====
-socket.on("media-message", (msg) => {
-    renderMessage(msg);
-});
-
-// ===== RENDER MESSAGE (alignment safe) =====
+// ===== RENDER MESSAGE (SAFE) =====
 function renderMessage(msg) {
     if (!mySocketId) return;
 
     const isMe = msg.senderId === mySocketId;
-
     const div = document.createElement("div");
+
     div.className = `msg ${isMe ? "me" : "other"}`;
     div.dataset.id = msg.id;
 
@@ -67,11 +60,18 @@ function renderMessage(msg) {
 
     if (msg.type === "text") {
         content = msg.text;
-    } else if (msg.type === "image") {
-        content = `<img src="${msg.data}" style="max-width:100%;border-radius:8px;" />`;
-    } else if (msg.type === "video") {
-        content = `<video src="${msg.data}" controls style="max-width:100%;border-radius:8px;"></video>`;
-    } else if (msg.type === "file") {
+    }
+
+    if (msg.type === "image") {
+        // 🔥 IMAGE FIX: explicit img tag + preload safe
+        content = `<img src="${msg.data}" alt="image" style="max-width:100%;border-radius:8px;" loading="lazy" />`;
+    }
+
+    if (msg.type === "video") {
+        content = `<video src="${msg.data}" controls playsinline style="max-width:100%;border-radius:8px;"></video>`;
+    }
+
+    if (msg.type === "file") {
         content = `<a href="${msg.data}" download="${msg.fileName}">📄 ${msg.fileName}</a>`;
     }
 
@@ -84,12 +84,10 @@ function renderMessage(msg) {
     chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
 
-    if (!isMe) {
-        socket.emit("seen", msg.id);
-    }
+    if (!isMe) socket.emit("seen", msg.id);
 }
 
-// ===== SEEN UPDATE =====
+// ===== SEEN =====
 socket.on("seen", (id) => {
     const el = document.querySelector(`[data-id="${id}"] .time`);
     if (el && !el.innerText.includes("✓✓")) {
@@ -97,10 +95,9 @@ socket.on("seen", (id) => {
     }
 });
 
-// ===== TYPING INDICATOR (SAFE) =====
+// ===== TYPING =====
 input.addEventListener("input", () => {
     socket.emit("typing");
-
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => {
         socket.emit("stopTyping");
@@ -108,16 +105,14 @@ input.addEventListener("input", () => {
 });
 
 socket.on("typing", (user) => {
-    if (user !== username) {
-        typingIndicator.innerText = `${user} is typing...`;
-    }
+    if (user !== username) typingIndicator.innerText = `${user} is typing...`;
 });
 
 socket.on("stopTyping", () => {
     typingIndicator.innerText = "";
 });
 
-// ===== SYSTEM MESSAGE =====
+// ===== SYSTEM =====
 socket.on("system", (text) => {
     const div = document.createElement("div");
     div.className = "system";
@@ -141,8 +136,8 @@ function closeAttachmentMenu() {
 
 document.querySelectorAll(".menu-item").forEach(item => {
     item.addEventListener("click", () => {
-        const type = item.dataset.type;
         closeAttachmentMenu();
+        const type = item.dataset.type;
 
         if (type === "image") imageInput.click();
         if (type === "video") videoInput.click();
@@ -150,11 +145,18 @@ document.querySelectorAll(".menu-item").forEach(item => {
     });
 });
 
-// ===== FILE UPLOAD (ISOLATED, NO DISCONNECT) =====
+// ===== FILE UPLOAD (PHOTO FIXED) =====
 function setupFileUpload(inputEl, mediaType) {
     inputEl.addEventListener("change", () => {
         const file = inputEl.files[0];
         if (!file) return;
+
+        // 🔒 IMAGE SIZE SAFETY (prevents silent fail)
+        if (mediaType === "image" && file.size > 2 * 1024 * 1024) {
+            alert("Image size should be less than 2MB");
+            inputEl.value = "";
+            return;
+        }
 
         const reader = new FileReader();
 
