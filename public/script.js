@@ -23,24 +23,29 @@ const sendVoice = document.getElementById("sendVoice");
 // ===== STATE =====
 let username = prompt("Enter your name") || "Guest";
 let mySocketId = null;
-let typingTimeout;
+let typingTimeout = null;
+let socketReady = false;
 
 let mediaRecorder;
 let audioChunks = [];
 let audioBlob = null;
+
+// 🔒 media send lock (VERY IMPORTANT)
+let mediaSending = false;
 
 // ===== JOIN =====
 socket.emit("join", username);
 
 socket.on("self-id", (id) => {
     mySocketId = id;
+    socketReady = true;
 });
 
 // ===== SEND TEXT =====
 form.addEventListener("submit", (e) => {
     e.preventDefault();
     const text = input.value.trim();
-    if (!text) return;
+    if (!text || !socketReady) return;
 
     socket.emit("message", { text });
     input.value = "";
@@ -48,53 +53,44 @@ form.addEventListener("submit", (e) => {
 });
 
 // ===== RECEIVE =====
-socket.on("message", (msg) => renderMessage(msg));
-socket.on("media-message", (msg) => renderMessage(msg));
+socket.on("message", (msg) => safeRender(msg));
+socket.on("media-message", (msg) => safeRender(msg));
 
-// ===== RENDER MESSAGE (🔥 FIXED & SAFE) =====
+// ===== SAFE RENDER WRAPPER =====
+function safeRender(msg) {
+    if (!socketReady) return;
+
+    // HARD VALIDATION (prevents random bugs)
+    if (!msg || !msg.senderId || !msg.type || !msg.createdAt) {
+        return;
+    }
+
+    renderMessage(msg);
+}
+
+// ===== RENDER MESSAGE (STABLE) =====
 function renderMessage(msg) {
-    if (!mySocketId) return;
-
-    // 🔒 Normalize data (VERY IMPORTANT)
-    const safeUser = msg.user || "Unknown";
-    const safeSenderId = msg.senderId || "";
-    const safeType = msg.type || msg.mediaType || "text";
-
-    const isMe = safeSenderId === mySocketId;
+    const isMe = msg.senderId === mySocketId;
 
     const div = document.createElement("div");
     div.className = `msg ${isMe ? "me" : "other"}`;
     div.dataset.id = msg.id || "";
 
-    const time = new Date(msg.createdAt || Date.now()).toLocaleTimeString("en-IN", {
+    const time = new Date(msg.createdAt).toLocaleTimeString("en-IN", {
         hour: "2-digit",
         minute: "2-digit"
     });
 
     let content = "";
 
-    if (safeType === "text") {
-        content = msg.text || "";
-    }
-
-    if (safeType === "image") {
-        content = `<img src="${msg.data}" style="max-width:100%;border-radius:8px;" />`;
-    }
-
-    if (safeType === "video") {
-        content = `<video src="${msg.data}" controls style="max-width:100%;border-radius:8px;"></video>`;
-    }
-
-    if (safeType === "file") {
-        content = `<a href="${msg.data}" download="${msg.fileName}">📄 ${msg.fileName}</a>`;
-    }
-
-    if (safeType === "audio") {
-        content = `<audio controls src="${msg.data}"></audio>`;
-    }
+    if (msg.type === "text") content = msg.text || "";
+    if (msg.type === "image") content = `<img src="${msg.data}" style="max-width:100%;border-radius:8px;">`;
+    if (msg.type === "video") content = `<video src="${msg.data}" controls style="max-width:100%;border-radius:8px;"></video>`;
+    if (msg.type === "file") content = `<a href="${msg.data}" download="${msg.fileName}">📄 ${msg.fileName}</a>`;
+    if (msg.type === "audio") content = `<audio controls src="${msg.data}"></audio>`;
 
     div.innerHTML = `
-        <strong>${safeUser}</strong><br>
+        <strong>${msg.user}</strong><br>
         ${content}
         <span class="time">${time}${isMe ? " ✓✓" : ""}</span>
     `;
@@ -102,9 +98,7 @@ function renderMessage(msg) {
     chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
 
-    if (!isMe && msg.id) {
-        socket.emit("seen", msg.id);
-    }
+    if (!isMe && msg.id) socket.emit("seen", msg.id);
 }
 
 // ===== SEEN =====
@@ -117,6 +111,7 @@ socket.on("seen", (id) => {
 
 // ===== TYPING =====
 input.addEventListener("input", () => {
+    if (!socketReady) return;
     socket.emit("typing");
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => socket.emit("stopTyping"), 800);
@@ -129,6 +124,7 @@ socket.on("stopTyping", () => typingIndicator.innerText = "");
 
 // ===== SYSTEM =====
 socket.on("system", (text) => {
+    if (!socketReady) return;
     const div = document.createElement("div");
     div.className = "system";
     div.innerText = text;
@@ -152,18 +148,21 @@ function closeAttachmentMenu() {
 document.querySelectorAll(".menu-item").forEach(item => {
     item.addEventListener("click", () => {
         closeAttachmentMenu();
-        const type = item.dataset.type;
-        if (type === "image") imageInput.click();
-        if (type === "video") videoInput.click();
-        if (type === "file") fileInput.click();
+        if (item.dataset.type === "image") imageInput.click();
+        if (item.dataset.type === "video") videoInput.click();
+        if (item.dataset.type === "file") fileInput.click();
     });
 });
 
-// ===== FILE UPLOAD (SAFE) =====
+// ===== FILE UPLOAD (LOCKED & SAFE) =====
 function setupFileUpload(inputEl, mediaType) {
     inputEl.addEventListener("change", () => {
+        if (mediaSending || !socketReady) return;
+
         const file = inputEl.files[0];
         if (!file) return;
+
+        mediaSending = true;
 
         const reader = new FileReader();
         reader.onload = () => {
@@ -173,7 +172,10 @@ function setupFileUpload(inputEl, mediaType) {
                 fileType: file.type,
                 data: reader.result
             });
+            mediaSending = false;
         };
+        reader.onerror = () => mediaSending = false;
+
         reader.readAsDataURL(file);
         inputEl.value = "";
     });
@@ -183,8 +185,10 @@ setupFileUpload(imageInput, "image");
 setupFileUpload(videoInput, "video");
 setupFileUpload(fileInput, "file");
 
-// ===== VOICE MESSAGE =====
+// ===== VOICE MESSAGE (LOCKED) =====
 micBtn.addEventListener("click", async () => {
+    if (mediaSending) return;
+
     if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
         return;
@@ -195,7 +199,6 @@ micBtn.addEventListener("click", async () => {
     audioChunks = [];
 
     mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-
     mediaRecorder.onstop = () => {
         audioBlob = new Blob(audioChunks, { type: "audio/webm" });
         voiceControls.classList.add("show");
@@ -210,7 +213,9 @@ cancelVoice.addEventListener("click", () => {
 });
 
 sendVoice.addEventListener("click", () => {
-    if (!audioBlob) return;
+    if (!audioBlob || mediaSending || !socketReady) return;
+
+    mediaSending = true;
 
     const reader = new FileReader();
     reader.onload = () => {
@@ -220,6 +225,7 @@ sendVoice.addEventListener("click", () => {
             fileType: "audio/webm",
             data: reader.result
         });
+        mediaSending = false;
     };
     reader.readAsDataURL(audioBlob);
 
