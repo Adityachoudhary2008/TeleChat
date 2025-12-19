@@ -33,20 +33,21 @@ let recordedBlob = null;
 socket.emit("join", username);
 socket.on("self-id", id => mySocketId = id);
 
-/* ===== TEXT ===== */
+/* ===== SEND TEXT ===== */
 form.addEventListener("submit", e => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
     socket.emit("message", { text });
     input.value = "";
+    socket.emit("stopTyping");
 });
 
 /* ===== RECEIVE ===== */
 socket.on("message", renderMessage);
 socket.on("media-message", renderMessage);
 
-/* ===== RENDER ===== */
+/* ===== RENDER MESSAGE ===== */
 function renderMessage(msg) {
     if (!mySocketId) return;
 
@@ -61,11 +62,25 @@ function renderMessage(msg) {
 
     let content = "";
 
-    if (msg.type === "text") content = msg.text;
-    if (msg.type === "image") content = `<img src="${msg.url}" onerror="this.remove()" style="max-width:100%;border-radius:8px;">`;
-    if (msg.type === "video") content = `<video src="${msg.url}" controls style="max-width:100%;border-radius:8px;"></video>`;
-    if (msg.type === "file") content = `<a href="${msg.url}" target="_blank">📄 Download file</a>`;
-    if (msg.type === "audio") content = `<audio controls src="${msg.url}"></audio>`;
+    if (msg.type === "text") {
+        content = msg.text;
+    }
+
+    if (msg.type === "image") {
+        content = `<img src="${msg.url}" style="max-width:100%;border-radius:8px;" />`;
+    }
+
+    if (msg.type === "video") {
+        content = `<video src="${msg.url}" controls style="max-width:100%;border-radius:8px;"></video>`;
+    }
+
+    if (msg.type === "file") {
+        content = `<a href="${msg.url}" target="_blank">📄 Download file</a>`;
+    }
+
+    if (msg.type === "audio") {
+        content = `<audio controls src="${msg.url}"></audio>`;
+    }
 
     div.innerHTML = `
         <strong>${msg.user}</strong><br>
@@ -77,20 +92,42 @@ function renderMessage(msg) {
     chat.scrollTop = chat.scrollHeight;
 }
 
+/* ===== TYPING ===== */
+input.addEventListener("input", () => {
+    socket.emit("typing");
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => socket.emit("stopTyping"), 800);
+});
+
+socket.on("typing", u => {
+    if (u !== username) typingIndicator.innerText = `${u} is typing...`;
+});
+socket.on("stopTyping", () => typingIndicator.innerText = "");
+
 /* ===== ATTACHMENT MENU ===== */
 attachBtn.onclick = () => {
     attachmentMenu.classList.add("show");
     overlay.classList.add("show");
 };
-overlay.onclick = () => {
+
+overlay.onclick = closeMenu;
+
+function closeMenu() {
     attachmentMenu.classList.remove("show");
     overlay.classList.remove("show");
-};
+}
 
-/* ===== SAFE UPLOAD (WITH RESPONSE CHECK) ===== */
-async function uploadAndSendFile(file, type) {
-    if (!file) return;
+document.querySelectorAll(".menu-item").forEach(item => {
+    item.onclick = () => {
+        closeMenu();
+        if (item.dataset.type === "image") imageInput.click();
+        if (item.dataset.type === "video") videoInput.click();
+        if (item.dataset.type === "file") fileInput.click();
+    };
+});
 
+/* ===== UPLOAD VIA CLOUDINARY ===== */
+async function uploadAndSend(file, type) {
     const reader = new FileReader();
     reader.onload = async () => {
         const res = await fetch("/upload", {
@@ -98,41 +135,17 @@ async function uploadAndSendFile(file, type) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ data: reader.result, type })
         });
-
-        if (!res.ok) {
-            console.error("Upload failed");
-            return;
-        }
-
-        const json = await res.json();
-        if (!json.url) {
-            console.error("No URL from server");
-            return;
-        }
-
-        socket.emit("media-message", { type, url: json.url });
+        const { url } = await res.json();
+        socket.emit("media-message", { type, url });
     };
     reader.readAsDataURL(file);
 }
 
-/* ===== FILE INPUTS ===== */
-imageInput.onchange = () => {
-    const f = imageInput.files[0];
-    imageInput.value = "";
-    uploadAndSendFile(f, "image");
-};
-videoInput.onchange = () => {
-    const f = videoInput.files[0];
-    videoInput.value = "";
-    uploadAndSendFile(f, "video");
-};
-fileInput.onchange = () => {
-    const f = fileInput.files[0];
-    fileInput.value = "";
-    uploadAndSendFile(f, "file");
-};
+imageInput.onchange = () => uploadAndSend(imageInput.files[0], "image");
+videoInput.onchange = () => uploadAndSend(videoInput.files[0], "video");
+fileInput.onchange  = () => uploadAndSend(fileInput.files[0], "file");
 
-/* ===== VOICE (FORCED MIME — THIS FIXES 0 SEC AUDIO) ===== */
+/* ===== VOICE MESSAGE (OLD UX RESTORED) ===== */
 micBtn.onclick = async () => {
     if (recorder && recorder.state === "recording") {
         recorder.stop();
@@ -140,22 +153,14 @@ micBtn.onclick = async () => {
     }
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-    recorder = new MediaRecorder(stream, {
-        mimeType: "audio/webm;codecs=opus"
-    });
-
+    recorder = new MediaRecorder(stream);
     audioChunks = [];
 
-    recorder.ondataavailable = e => {
-        if (e.data.size > 0) audioChunks.push(e.data);
-    };
+    recorder.ondataavailable = e => audioChunks.push(e.data);
 
     recorder.onstop = () => {
-        recordedBlob = new Blob(audioChunks, { type: "audio/webm;codecs=opus" });
-        if (recordedBlob.size > 0) {
-            voiceControls.classList.add("show");
-        }
+        recordedBlob = new Blob(audioChunks, { type: "audio/webm" });
+        voiceControls.classList.add("show");
     };
 
     recorder.start();
@@ -167,8 +172,9 @@ cancelVoice.onclick = () => {
 };
 
 sendVoice.onclick = () => {
-    if (!recordedBlob || recordedBlob.size === 0) return;
-    uploadAndSendFile(new File([recordedBlob], "voice.webm"), "audio");
+    if (!recordedBlob) return;
+
+    uploadAndSend(new File([recordedBlob], "voice.webm"), "audio");
     recordedBlob = null;
     voiceControls.classList.remove("show");
 };
