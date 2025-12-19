@@ -18,11 +18,15 @@
         <span id="attachBtn">📎</span>
 
         <input id="input" type="text" placeholder="Message" autocomplete="off" />
+
+        <!-- VOICE BUTTON -->
+        <span id="voiceBtn" title="Hold to record">🎤</span>
+
         <button type="submit">➤</button>
     </form>
 </div>
 
-<!-- Attachment Bottom Sheet -->
+<!-- Attachment UI (unchanged) -->
 <div class="overlay" id="overlay"></div>
 
 <div class="attachment-menu" id="attachmentMenu">
@@ -31,7 +35,7 @@
     <div class="menu-item" data-type="file">📄 Document</div>
 </div>
 
-<!-- Hidden file inputs (existing logic reused) -->
+<!-- Hidden inputs (unchanged) -->
 <input type="file" id="imageInput" accept="image/*" hidden>
 <input type="file" id="videoInput" accept="video/*" hidden>
 <input type="file" id="fileInput" hidden>

@@ -14,6 +14,8 @@ const imageInput = document.getElementById("imageInput");
 const videoInput = document.getElementById("videoInput");
 const fileInput = document.getElementById("fileInput");
 
+const voiceBtn = document.getElementById("voiceBtn");
+
 // ===== STATE =====
 let username = prompt("Enter your name") || "Guest";
 let mySocketId = null;
@@ -41,13 +43,12 @@ form.addEventListener("submit", (e) => {
 socket.on("message", renderMessage);
 socket.on("media-message", renderMessage);
 
-// ===== RENDER MESSAGE (SAFE) =====
+// ===== RENDER MESSAGE =====
 function renderMessage(msg) {
     if (!mySocketId) return;
 
     const isMe = msg.senderId === mySocketId;
     const div = document.createElement("div");
-
     div.className = `msg ${isMe ? "me" : "other"}`;
     div.dataset.id = msg.id;
 
@@ -58,22 +59,19 @@ function renderMessage(msg) {
 
     let content = "";
 
-    if (msg.type === "text") {
-        content = msg.text;
-    }
+    if (msg.type === "text") content = msg.text;
 
-    if (msg.type === "image") {
-        // 🔥 IMAGE FIX: explicit img tag + preload safe
-        content = `<img src="${msg.data}" alt="image" style="max-width:100%;border-radius:8px;" loading="lazy" />`;
-    }
+    if (msg.type === "image")
+        content = `<img src="${msg.data}" style="max-width:100%;border-radius:8px;">`;
 
-    if (msg.type === "video") {
-        content = `<video src="${msg.data}" controls playsinline style="max-width:100%;border-radius:8px;"></video>`;
-    }
+    if (msg.type === "video")
+        content = `<video src="${msg.data}" controls style="max-width:100%;border-radius:8px;"></video>`;
 
-    if (msg.type === "file") {
+    if (msg.type === "file")
         content = `<a href="${msg.data}" download="${msg.fileName}">📄 ${msg.fileName}</a>`;
-    }
+
+    if (msg.type === "audio")
+        content = `<audio src="${msg.data}" controls></audio>`;
 
     div.innerHTML = `
         <strong>${msg.user}</strong><br>
@@ -145,21 +143,13 @@ document.querySelectorAll(".menu-item").forEach(item => {
     });
 });
 
-// ===== FILE UPLOAD (PHOTO FIXED) =====
+// ===== FILE UPLOAD =====
 function setupFileUpload(inputEl, mediaType) {
     inputEl.addEventListener("change", () => {
         const file = inputEl.files[0];
         if (!file) return;
 
-        // 🔒 IMAGE SIZE SAFETY (prevents silent fail)
-        if (mediaType === "image" && file.size > 2 * 1024 * 1024) {
-            alert("Image size should be less than 2MB");
-            inputEl.value = "";
-            return;
-        }
-
         const reader = new FileReader();
-
         reader.onload = () => {
             socket.emit("media-message", {
                 mediaType,
@@ -168,7 +158,6 @@ function setupFileUpload(inputEl, mediaType) {
                 data: reader.result
             });
         };
-
         reader.readAsDataURL(file);
         inputEl.value = "";
     });
@@ -177,3 +166,46 @@ function setupFileUpload(inputEl, mediaType) {
 setupFileUpload(imageInput, "image");
 setupFileUpload(videoInput, "video");
 setupFileUpload(fileInput, "file");
+
+// ===== VOICE MESSAGE (NEW FEATURE) =====
+let mediaRecorder;
+let audioChunks = [];
+
+voiceBtn.addEventListener("mousedown", startRecording);
+voiceBtn.addEventListener("touchstart", startRecording);
+
+voiceBtn.addEventListener("mouseup", stopRecording);
+voiceBtn.addEventListener("touchend", stopRecording);
+
+async function startRecording() {
+    audioChunks = [];
+
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+
+    mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+        const reader = new FileReader();
+
+        reader.onload = () => {
+            socket.emit("media-message", {
+                mediaType: "audio",
+                fileName: "voice-message.webm",
+                fileType: "audio/webm",
+                data: reader.result
+            });
+        };
+
+        reader.readAsDataURL(audioBlob);
+    };
+
+    mediaRecorder.start();
+}
+
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+    }
+}
