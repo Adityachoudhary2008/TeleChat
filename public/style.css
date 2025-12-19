@@ -17,17 +17,25 @@ body {
     align-items: center;
 }
 
-/* MAIN APP CONTAINER */
+/* APP CONTAINER */
 .app {
     width: 100%;
-    max-width: 420px;
-    height: 100vh;
-    max-height: 700px;
+    max-width: 420px;          /* desktop / tablet limit */
+    height: 100dvh;            /* dynamic viewport height */
     background: #111827;
     border-radius: 14px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+}
+
+/* DESKTOP ONLY: center with rounded corners */
+@media (min-width: 768px) {
+    .app {
+        height: 92vh;
+        max-height: 720px;
+        border-radius: 16px;
+    }
 }
 
 /* HEADER */
@@ -50,7 +58,7 @@ body {
 
 /* MESSAGE BUBBLES */
 .msg {
-    max-width: 80%;
+    max-width: 75%;
     margin-bottom: 10px;
     padding: 8px 12px;
     border-radius: 10px;
@@ -81,30 +89,31 @@ body {
 .time {
     display: block;
     font-size: 10px;
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255,255,255,0.6);
     margin-top: 4px;
     text-align: right;
 }
 
 /* TYPING INDICATOR */
 .typing {
-    min-height: 18px;
+    height: 18px;
     padding: 2px 12px;
     font-size: 12px;
     color: #9ca3af;
     flex-shrink: 0;
 }
 
-/* INPUT AREA */
+/* INPUT BAR */
 .input-box {
     display: flex;
     align-items: center;
-    gap: 8px;
     padding: 10px;
     background: #1f2937;
+    gap: 6px;
     flex-shrink: 0;
 }
 
+/* INPUT FIELD */
 .input-box input[type="text"] {
     flex: 1;
     border: none;
@@ -114,6 +123,7 @@ body {
     font-size: 14px;
 }
 
+/* SEND BUTTON */
 .input-box button {
     width: 42px;
     height: 42px;
@@ -123,32 +133,19 @@ body {
     color: white;
     cursor: pointer;
     font-size: 16px;
-    flex-shrink: 0;
 }
 
-/* MEDIA INSIDE MESSAGES */
+/* ATTACH ICON */
+.input-box label {
+    font-size: 18px;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* MEDIA INSIDE CHAT */
 .msg img,
 .msg video {
     max-width: 100%;
+    height: auto;
     border-radius: 8px;
-}
-
-/* 📱 MOBILE OPTIMIZATION */
-@media (max-width: 480px) {
-    body {
-        align-items: stretch;
-    }
-
-    .app {
-        height: 100vh;
-        max-height: none;
-        border-radius: 0;
-    }
-}
-
-/* 💻 LARGE SCREENS */
-@media (min-width: 1024px) {
-    .app {
-        max-height: 720px;
-    }
 }
