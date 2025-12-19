@@ -5,7 +5,6 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 
-// Socket.IO with safe CORS (Railway friendly)
 const io = new Server(server, {
     cors: {
         origin: "*",
@@ -16,7 +15,6 @@ const io = new Server(server, {
 // Serve frontend
 app.use(express.static("public"));
 
-// Socket logic
 io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
@@ -25,15 +23,25 @@ io.on("connection", (socket) => {
         socket.broadcast.emit("system", `${username} joined TeleChat`);
     });
 
+    // MESSAGE WITH SERVER TIMESTAMP
     socket.on("message", (text) => {
         io.emit("message", {
             user: socket.username,
             text,
-            time: new Date().toLocaleTimeString([], {
+            time: new Date().toLocaleTimeString("en-IN", {
                 hour: "2-digit",
                 minute: "2-digit"
             })
         });
+    });
+
+    // TYPING INDICATOR
+    socket.on("typing", () => {
+        socket.broadcast.emit("typing", socket.username);
+    });
+
+    socket.on("stopTyping", () => {
+        socket.broadcast.emit("stopTyping", socket.username);
     });
 
     socket.on("disconnect", () => {
@@ -43,8 +51,8 @@ io.on("connection", (socket) => {
     });
 });
 
-// Railway PORT
+// Railway-safe PORT
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`TeleChat running on port ${PORT}`);
+    console.log("TeleChat running on port", PORT);
 });
