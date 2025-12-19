@@ -15,25 +15,26 @@
     <div id="typingIndicator" class="typing"></div>
 
     <form class="input-box" id="form">
-        <!-- ATTACH BUTTON -->
-        <div class="attach-wrapper">
-            <span id="attachBtn">📎</span>
-
-            <!-- ATTACHMENT MENU -->
-            <div id="attachMenu" class="attach-menu">
-                <button type="button" data-type="image">📷 Photo</button>
-                <button type="button" data-type="video">🎥 Video</button>
-                <button type="button" data-type="file">📄 File</button>
-            </div>
-        </div>
-
-        <!-- HIDDEN FILE INPUT -->
-        <input type="file" id="fileInput" hidden />
+        <span id="attachBtn">📎</span>
 
         <input id="input" type="text" placeholder="Message" autocomplete="off" />
         <button type="submit">➤</button>
     </form>
 </div>
+
+<!-- Attachment Bottom Sheet -->
+<div class="overlay" id="overlay"></div>
+
+<div class="attachment-menu" id="attachmentMenu">
+    <div class="menu-item" data-type="image">📷 Photo</div>
+    <div class="menu-item" data-type="video">🎥 Video</div>
+    <div class="menu-item" data-type="file">📄 Document</div>
+</div>
+
+<!-- Hidden file inputs (existing logic reused) -->
+<input type="file" id="imageInput" accept="image/*" hidden>
+<input type="file" id="videoInput" accept="video/*" hidden>
+<input type="file" id="fileInput" hidden>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="script.js"></script>
