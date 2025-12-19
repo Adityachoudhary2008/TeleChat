@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>TeleChat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="style.css">
 </head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <body>
 
 <div class="app">
@@ -16,7 +15,19 @@
     <div id="typingIndicator" class="typing"></div>
 
     <form class="input-box" id="form">
-        <label for="fileInput" style="cursor:pointer;">📎</label>
+        <!-- ATTACH BUTTON -->
+        <div class="attach-wrapper">
+            <span id="attachBtn">📎</span>
+
+            <!-- ATTACHMENT MENU -->
+            <div id="attachMenu" class="attach-menu">
+                <button type="button" data-type="image">📷 Photo</button>
+                <button type="button" data-type="video">🎥 Video</button>
+                <button type="button" data-type="file">📄 File</button>
+            </div>
+        </div>
+
+        <!-- FILE INPUT (hidden, reused) -->
         <input type="file" id="fileInput" hidden />
 
         <input id="input" type="text" placeholder="Message" autocomplete="off" />

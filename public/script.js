@@ -6,6 +6,9 @@ const input = document.getElementById("input");
 const fileInput = document.getElementById("fileInput");
 const typingIndicator = document.getElementById("typingIndicator");
 
+const attachBtn = document.getElementById("attachBtn");
+const attachMenu = document.getElementById("attachMenu");
+
 let username = prompt("Enter your name") || "Guest";
 let mySocketId = null;
 let typingTimeout;
@@ -14,7 +17,7 @@ socket.emit("join", username);
 
 socket.on("self-id", (id) => mySocketId = id);
 
-// SEND TEXT MESSAGE (unchanged)
+/* ---------- TEXT MESSAGE (UNCHANGED) ---------- */
 form.addEventListener("submit", (e) => {
     e.preventDefault();
     const text = input.value.trim();
@@ -25,7 +28,31 @@ form.addEventListener("submit", (e) => {
     socket.emit("stopTyping");
 });
 
-// MEDIA UPLOAD
+/* ---------- ATTACHMENT MENU TOGGLE ---------- */
+attachBtn.addEventListener("click", () => {
+    attachMenu.style.display =
+        attachMenu.style.display === "flex" ? "none" : "flex";
+});
+
+/* ---------- ATTACHMENT TYPE SELECTION ---------- */
+attachMenu.addEventListener("click", (e) => {
+    if (!e.target.dataset.type) return;
+
+    const type = e.target.dataset.type;
+
+    if (type === "image") {
+        fileInput.accept = "image/*";
+    } else if (type === "video") {
+        fileInput.accept = "video/*";
+    } else {
+        fileInput.accept = "*/*";
+    }
+
+    attachMenu.style.display = "none";
+    fileInput.click();
+});
+
+/* ---------- MEDIA UPLOAD (UNCHANGED LOGIC) ---------- */
 fileInput.addEventListener("change", () => {
     const file = fileInput.files[0];
     if (!file) return;
@@ -49,10 +76,8 @@ fileInput.addEventListener("change", () => {
     fileInput.value = "";
 });
 
-// RECEIVE TEXT MESSAGE
+/* ---------- RECEIVE MESSAGES (UNCHANGED) ---------- */
 socket.on("message", (msg) => renderMessage(msg));
-
-// RECEIVE MEDIA MESSAGE
 socket.on("media-message", (msg) => renderMessage(msg));
 
 function renderMessage(msg) {
@@ -89,7 +114,7 @@ function renderMessage(msg) {
     if (!isMe) socket.emit("seen", msg.id);
 }
 
-// TYPING (unchanged)
+/* ---------- TYPING (UNCHANGED) ---------- */
 input.addEventListener("input", () => {
     socket.emit("typing");
     clearTimeout(typingTimeout);
@@ -108,7 +133,7 @@ socket.on("stopTyping", () => {
     typingIndicator.innerText = "";
 });
 
-// SYSTEM
+/* ---------- SYSTEM ---------- */
 socket.on("system", (text) => {
     const div = document.createElement("div");
     div.className = "system";
