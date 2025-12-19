@@ -33,14 +33,13 @@ let recordedBlob = null;
 socket.emit("join", username);
 socket.on("self-id", id => mySocketId = id);
 
-/* ===== SEND TEXT ===== */
+/* ===== TEXT ===== */
 form.addEventListener("submit", e => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
     socket.emit("message", { text });
     input.value = "";
-    socket.emit("stopTyping");
 });
 
 /* ===== RECEIVE ===== */
@@ -61,8 +60,9 @@ function renderMessage(msg) {
     });
 
     let content = "";
+
     if (msg.type === "text") content = msg.text;
-    if (msg.type === "image") content = `<img src="${msg.url}" style="max-width:100%;border-radius:8px;">`;
+    if (msg.type === "image") content = `<img src="${msg.url}" onerror="this.remove()" style="max-width:100%;border-radius:8px;">`;
     if (msg.type === "video") content = `<video src="${msg.url}" controls style="max-width:100%;border-radius:8px;"></video>`;
     if (msg.type === "file") content = `<a href="${msg.url}" target="_blank">📄 Download file</a>`;
     if (msg.type === "audio") content = `<audio controls src="${msg.url}"></audio>`;
@@ -77,15 +77,6 @@ function renderMessage(msg) {
     chat.scrollTop = chat.scrollHeight;
 }
 
-/* ===== TYPING ===== */
-input.addEventListener("input", () => {
-    socket.emit("typing");
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(() => socket.emit("stopTyping"), 800);
-});
-socket.on("typing", u => u !== username && (typingIndicator.innerText = `${u} is typing...`));
-socket.on("stopTyping", () => typingIndicator.innerText = "");
-
 /* ===== ATTACHMENT MENU ===== */
 attachBtn.onclick = () => {
     attachmentMenu.classList.add("show");
@@ -96,7 +87,7 @@ overlay.onclick = () => {
     overlay.classList.remove("show");
 };
 
-/* ===== SAFE UPLOAD FUNCTION ===== */
+/* ===== SAFE UPLOAD (WITH RESPONSE CHECK) ===== */
 async function uploadAndSendFile(file, type) {
     if (!file) return;
 
@@ -107,32 +98,41 @@ async function uploadAndSendFile(file, type) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ data: reader.result, type })
         });
-        const { url } = await res.json();
-        socket.emit("media-message", { type, url });
+
+        if (!res.ok) {
+            console.error("Upload failed");
+            return;
+        }
+
+        const json = await res.json();
+        if (!json.url) {
+            console.error("No URL from server");
+            return;
+        }
+
+        socket.emit("media-message", { type, url: json.url });
     };
     reader.readAsDataURL(file);
 }
 
-/* ===== FILE INPUTS (LOCKED) ===== */
+/* ===== FILE INPUTS ===== */
 imageInput.onchange = () => {
-    const file = imageInput.files[0];
+    const f = imageInput.files[0];
     imageInput.value = "";
-    uploadAndSendFile(file, "image");
+    uploadAndSendFile(f, "image");
 };
-
 videoInput.onchange = () => {
-    const file = videoInput.files[0];
+    const f = videoInput.files[0];
     videoInput.value = "";
-    uploadAndSendFile(file, "video");
+    uploadAndSendFile(f, "video");
 };
-
 fileInput.onchange = () => {
-    const file = fileInput.files[0];
+    const f = fileInput.files[0];
     fileInput.value = "";
-    uploadAndSendFile(file, "file");
+    uploadAndSendFile(f, "file");
 };
 
-/* ===== VOICE MESSAGE (FIXED PROPERLY) ===== */
+/* ===== VOICE (FORCED MIME — THIS FIXES 0 SEC AUDIO) ===== */
 micBtn.onclick = async () => {
     if (recorder && recorder.state === "recording") {
         recorder.stop();
@@ -140,7 +140,11 @@ micBtn.onclick = async () => {
     }
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    recorder = new MediaRecorder(stream);
+
+    recorder = new MediaRecorder(stream, {
+        mimeType: "audio/webm;codecs=opus"
+    });
+
     audioChunks = [];
 
     recorder.ondataavailable = e => {
@@ -148,9 +152,10 @@ micBtn.onclick = async () => {
     };
 
     recorder.onstop = () => {
-        if (audioChunks.length === 0) return;
-        recordedBlob = new Blob(audioChunks, { type: "audio/webm" });
-        voiceControls.classList.add("show");
+        recordedBlob = new Blob(audioChunks, { type: "audio/webm;codecs=opus" });
+        if (recordedBlob.size > 0) {
+            voiceControls.classList.add("show");
+        }
     };
 
     recorder.start();
