@@ -17,7 +17,8 @@ socket.emit("join", username);
 
 socket.on("self-id", (id) => mySocketId = id);
 
-/* ---------- TEXT MESSAGE (UNCHANGED) ---------- */
+/* ---------------- TEXT MESSAGE (UNCHANGED) ---------------- */
+
 form.addEventListener("submit", (e) => {
     e.preventDefault();
     const text = input.value.trim();
@@ -28,31 +29,30 @@ form.addEventListener("submit", (e) => {
     socket.emit("stopTyping");
 });
 
-/* ---------- ATTACHMENT MENU TOGGLE ---------- */
+/* ---------------- ATTACH MENU TOGGLE ---------------- */
+
 attachBtn.addEventListener("click", () => {
     attachMenu.style.display =
         attachMenu.style.display === "flex" ? "none" : "flex";
 });
 
-/* ---------- ATTACHMENT TYPE SELECTION ---------- */
+/* ---------------- FILE TYPE SELECTION ---------------- */
+
 attachMenu.addEventListener("click", (e) => {
-    if (!e.target.dataset.type) return;
+    if (e.target.tagName !== "BUTTON") return;
 
     const type = e.target.dataset.type;
 
-    if (type === "image") {
-        fileInput.accept = "image/*";
-    } else if (type === "video") {
-        fileInput.accept = "video/*";
-    } else {
-        fileInput.accept = "*/*";
-    }
+    if (type === "image") fileInput.accept = "image/*";
+    else if (type === "video") fileInput.accept = "video/*";
+    else fileInput.accept = "*/*";
 
-    attachMenu.style.display = "none";
     fileInput.click();
+    attachMenu.style.display = "none";
 });
 
-/* ---------- MEDIA UPLOAD (UNCHANGED LOGIC) ---------- */
+/* ---------------- MEDIA UPLOAD (UNCHANGED LOGIC) ---------------- */
+
 fileInput.addEventListener("change", () => {
     const file = fileInput.files[0];
     if (!file) return;
@@ -76,7 +76,8 @@ fileInput.addEventListener("change", () => {
     fileInput.value = "";
 });
 
-/* ---------- RECEIVE MESSAGES (UNCHANGED) ---------- */
+/* ---------------- RECEIVE MESSAGES (UNCHANGED) ---------------- */
+
 socket.on("message", (msg) => renderMessage(msg));
 socket.on("media-message", (msg) => renderMessage(msg));
 
@@ -92,15 +93,13 @@ function renderMessage(msg) {
     });
 
     let content = "";
-    if (msg.type === "text") {
-        content = msg.text;
-    } else if (msg.type === "image") {
-        content = `<img src="${msg.data}" style="max-width:100%;border-radius:8px;" />`;
-    } else if (msg.type === "video") {
+    if (msg.type === "text") content = msg.text;
+    else if (msg.type === "image")
+        content = `<img src="${msg.data}" style="max-width:100%;border-radius:8px;">`;
+    else if (msg.type === "video")
         content = `<video src="${msg.data}" controls style="max-width:100%;border-radius:8px;"></video>`;
-    } else {
+    else
         content = `<a href="${msg.data}" download="${msg.fileName}">📄 ${msg.fileName}</a>`;
-    }
 
     div.innerHTML = `
         <strong>${msg.user}</strong><br>
@@ -114,7 +113,8 @@ function renderMessage(msg) {
     if (!isMe) socket.emit("seen", msg.id);
 }
 
-/* ---------- TYPING (UNCHANGED) ---------- */
+/* ---------------- TYPING (UNCHANGED) ---------------- */
+
 input.addEventListener("input", () => {
     socket.emit("typing");
     clearTimeout(typingTimeout);
@@ -133,7 +133,8 @@ socket.on("stopTyping", () => {
     typingIndicator.innerText = "";
 });
 
-/* ---------- SYSTEM ---------- */
+/* ---------------- SYSTEM ---------------- */
+
 socket.on("system", (text) => {
     const div = document.createElement("div");
     div.className = "system";
