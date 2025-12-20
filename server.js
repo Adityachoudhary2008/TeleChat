@@ -21,6 +21,9 @@ cloudinary.config({
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static("public"));
 
+/* ================= ONLINE USERS STORE (ADDED) ================= */
+const onlineUsers = {};
+
 /* ================= SOCKET ================= */
 io.on("connection", (socket) => {
 
@@ -28,6 +31,10 @@ io.on("connection", (socket) => {
         socket.username = username || "Guest";
         socket.emit("self-id", socket.id);
         socket.broadcast.emit("system", `${socket.username} joined TeleChat`);
+
+        /* ===== ADD: track online user ===== */
+        onlineUsers[socket.id] = socket.username;
+        io.emit("users-update", Object.values(onlineUsers));
     });
 
     socket.on("message", ({ text }) => {
@@ -60,6 +67,10 @@ io.on("connection", (socket) => {
         if (socket.username) {
             socket.broadcast.emit("system", `${socket.username} left TeleChat`);
         }
+
+        /* ===== ADD: remove offline user ===== */
+        delete onlineUsers[socket.id];
+        io.emit("users-update", Object.values(onlineUsers));
     });
 });
 

@@ -245,3 +245,8 @@ body {
     background: #2563eb;
     color: white;
 }
+.online-users {
+    padding: 6px 10px;
+    font-size: 14px;
+    border-bottom: 1px solid #ddd;
+}

@@ -6,6 +6,9 @@ const form = document.getElementById("form");
 const input = document.getElementById("input");
 const typingIndicator = document.getElementById("typingIndicator");
 
+/* ===== ADD: online users container ===== */
+const usersList = document.getElementById("usersList");
+
 const attachBtn = document.getElementById("attachBtn");
 const micBtn = document.getElementById("micBtn");
 
@@ -32,6 +35,18 @@ let recordedBlob = null;
 /* ===== JOIN ===== */
 socket.emit("join", username);
 socket.on("self-id", id => mySocketId = id);
+
+/* ===== ADD: online users update ===== */
+socket.on("users-update", (users) => {
+    if (!usersList) return;
+    usersList.innerHTML = "";
+
+    users.forEach(u => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span style="color:green;">●</span> ${u}`;
+        usersList.appendChild(li);
+    });
+});
 
 /* ===== SEND TEXT ===== */
 form.addEventListener("submit", e => {
