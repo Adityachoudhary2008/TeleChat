@@ -249,4 +249,9 @@ body {
     padding: 6px 10px;
     font-size: 14px;
     border-bottom: 1px solid #ddd;
+    
+}
+/* Online users text color fix */
+#usersList li {
+    color: #ffffff;
 }
